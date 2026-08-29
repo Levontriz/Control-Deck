@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>DougDoug Style Overlay</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            width: 100vw;
+            height: 100vh;
+            overflow: hidden;
+            background: transparent; /* Essential for OBS transparency */
+            font-family: 'Arial Black', sans-serif;
+        }
+        .spawned-item {
+            position: absolute;
+            padding: 10px 20px;
+            background: #ffcc00;
+            color: #000;
+            border: 4px solid #000;
+            border-radius: 10px;
+            font-size: 1.5vw; /* Scales text relative to the screen width */
+            white-space: nowrap; /* Prevents long names from breaking into two rows */
+            box-shadow: 5px 5px 0px #000; /* Optional: Adds that blocky, retro stream aesthetic */
+            animation: fallAndBounce 3s ease-in-out forwards;
+        }
+
+        @keyframes fallAndBounce {
+            0% { transform: translateY(-100px) rotate(0deg); opacity: 0; }
+            10% { opacity: 1; }
+            70% { transform: translateY(80vh) rotate(15deg); }
+            100% { transform: translateY(110vh) rotate(45deg); opacity: 0; }
+        }
+    </style>
+</head>
+<body>
+    <div id="overlay-container"></div>
+
+    <script>
+    const container = document.getElementById('overlay-container');
+
+    function connectWebSocket() {
+        console.log('Attempting to connect to overlay server...');
+        const ws = new WebSocket('ws://localhost:8080');
+
+        ws.onopen = () => {
+            console.log('Successfully connected to overlay server!');
+        };
+
+        ws.onmessage = (event) => {
+            try {
+                const data = JSON.parse(event.data);
+                if (data.type === 'SPAWN_ITEM') {
+                    createStreamElement(data.username, data.colour);
+                }
+            } catch (err) {
+                console.error('Failed to parse WebSocket message data:', err);
+            }
+        };
+
+        ws.onclose = () => {
+            console.warn('Overlay server connection lost. Retrying in 3 seconds...');
+            // Automatically retry connecting after a short delay
+            setTimeout(connectWebSocket, 3000);
+        };
+
+        ws.onerror = (error) => {
+            console.error('WebSocket connection error encountered:', error);
+            // Let onclose handle the reconnection logic
+            ws.close();
+        };
+    }
+
+    function createStreamElement(username, colour) {
+        const item = document.createElement('div');
+        item.className = 'spawned-item';
+        item.style.background = colour;
+
+        // Randomise horizontal position across the viewport width
+        item.style.left = (Math.random() * 80) + 'vw';
+        item.innerText = `${username} entered!`;
+        
+        container.appendChild(item);
+        
+        // Remove from DOM after animation finishes to keep memory clear
+        setTimeout(() => item.remove(), 3000);
+    }
+
+    // Fire up the initial connection loop
+    connectWebSocket();
+</script>
+
+</body>
+</html>

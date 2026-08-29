@@ -1,0 +1,83 @@
+{
+  "grid": {
+    "columns": 5,
+    "rows": 3
+  },
+  "buttons": [
+    {
+      "id": "spawn_item",
+      "position": 1,
+      "label": "Spawn Item",
+      "type": "action",
+      "endpoint": "/api/macro",
+      "payload": { "action": "SPAWN_ITEM" }
+    },
+    {
+      "id": "media_folder",
+      "position": 2,
+      "label": "📁 Media",
+      "type": "folder",
+      "children": [
+        {
+          "id": "media_play",
+          "position": 2,
+          "label": "⏯ Play/Pause",
+          "type": "action",
+          "endpoint": "/api/media",
+          "payload": { "command": "TOGGLE" }
+        },
+        {
+          "id": "media_previous",
+          "position": 3,
+          "label": "⏮ Previous",
+          "type": "action",
+          "endpoint": "/api/media",
+          "payload": { "command": "PREVIOUS" }
+        },
+		{
+          "id": "media_skip",
+          "position": 4,
+          "label": "⏭ Skip",
+          "type": "action",
+          "endpoint": "/api/media",
+          "payload": { "command": "NEXT" }
+        }
+      ]
+    },
+	{
+  "id": "soundboard_folder",
+      "position": 3,
+      "label": "📁 Soundboard",
+      "type": "folder",
+      "children": [
+        {
+			"id": "sound_airhorn",
+      		"position": 2,
+			"label": "📢 Airhorn",
+			"type": "action",
+      "volume": 35,
+			"endpoint": "/api/soundboard",
+			"payload": { "sound": "air_horn" }
+		}
+      ]
+    },
+    {
+      "id": "mute_mic",
+      "position": 5,
+      "label": "🎙 Mute Mic",
+      "type": "action",
+      "endpoint": "/api/audio",
+      "payload": { "target": "mic", "state": "toggle" },
+      "status": "mic"
+    },
+    {
+      "id": "mic_passthrough",
+      "position": 4,
+      "label": "🎤 Mic to Discord",
+      "type": "action",
+      "endpoint": "/api/audio-passthrough",
+      "payload": { "state": "toggle" },
+      "status": "link"
+    }
+  ]
+}

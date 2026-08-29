@@ -1,0 +1,294 @@
+/* --- Core Layout Defaults --- */
+html, body {
+  margin: 0;
+  padding: 0;
+  width: 100vw;
+  height: 100vh;
+  background-color: #0c0e12;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+.deck-container {
+  display: grid;
+  width: 100vw;
+  height: 100vh;
+  padding: 12px; 
+  gap: 12px;
+  box-sizing: border-box;
+}
+
+/* --- Flexible Base Deck Styling --- */
+.deck-button {
+  background: linear-gradient(145deg, #1b1e24, #0f1115);
+  border: 2px solid #282d37;
+  border-radius: 14px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.05s ease, border-color 0.1s ease;
+}
+
+.deck-button span {
+  color: #e2e8f0;
+  font-family: system-ui, sans-serif;
+  font-weight: 700;
+  font-size: clamp(0.85rem, 2.2vw, 1.2rem);
+  text-align: center;
+}
+
+.button-label {
+  max-width: 100%;
+}
+
+.volume-control {
+  align-items: center;
+  bottom: 9px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  left: 10px;
+  position: absolute;
+  right: 10px;
+}
+
+.volume-label {
+  color: #94a3b8;
+  font: 700 clamp(0.56rem, 1.4vw, 0.72rem)/1 system-ui, sans-serif;
+}
+
+.volume-label strong {
+  color: #e2e8f0;
+}
+
+.volume-slider {
+  accent-color: #2dd4bf;
+  cursor: pointer;
+  height: 18px;
+  touch-action: manipulation;
+  width: 100%;
+}
+
+.deck-button:active {
+  transform: scale(0.95);
+  border-color: #2dd4bf;
+}
+
+/* --- State Variant Definitions --- */
+.folder-button {
+  border-color: #f59e0b; /* Amber accent color signifying a folder */
+}
+.folder-button:active {
+  border-color: #fbbf24;
+}
+
+.nav-button {
+  border-color: #3b82f6; /* Blue tint specialized for Back key navigation actions */
+}
+
+.empty-slot {
+  background: #080a0d;
+  border: 2px dashed #161b22;
+  cursor: default;
+  opacity: 0.4;
+}
+
+/* --- Fullscreen Overlay Layout (Inherited from build rules) --- */
+.fullscreen-overlay { align-items: center; background: rgba(8, 12, 18, 0.96); display: flex; inset: 0; justify-content: center; padding: 24px; position: fixed; z-index: 10; }
+.fullscreen-panel { max-width: 520px; text-align: center; width: 100%; }
+.fullscreen-kicker { color: #2dd4bf; font-size: 0.8rem; font-weight: 700; letter-spacing: 0.14em; margin: 0 0 16px; text-transform: uppercase; }
+.fullscreen-panel h2 { color: #f8fafc; font-size: clamp(1.8rem, 6vw, 3.2rem); margin: 0 0 32px; }
+.fullscreen-button { background: #2dd4bf; border: 0; border-radius: 12px; color: #082f49; cursor: pointer; font-size: clamp(1.1rem, 4vw, 1.5rem); font-weight: 800; min-height: 76px; padding: 18px 40px; width: min(100%, 360px); }
+.fullscreen-button:active { transform: scale(0.98); }
+.fullscreen-overlay.is-hidden { display: none; }
+
+
+
+.fullscreen-overlay {
+	align-items: center;
+	background: rgba(8, 12, 18, 0.96);
+	display: flex;
+	inset: 0;
+	justify-content: center;
+	padding: 24px;
+	position: fixed;
+	z-index: 10;
+}
+
+.fullscreen-panel {
+	max-width: 520px;
+	text-align: center;
+	width: 100%;
+}
+
+.fullscreen-kicker {
+	color: #2dd4bf;
+	font-size: 0.8rem;
+	font-weight: 700;
+	letter-spacing: 0.14em;
+	margin: 0 0 16px;
+	text-transform: uppercase;
+}
+
+.fullscreen-panel h2 {
+	color: #f8fafc;
+	font-size: clamp(1.8rem, 6vw, 3.2rem);
+	margin: 0 0 32px;
+}
+
+.fullscreen-button {
+	background: #2dd4bf;
+	border: 0;
+	border-radius: 12px;
+	color: #082f49;
+	cursor: pointer;
+	font-size: clamp(1.1rem, 4vw, 1.5rem);
+	font-weight: 800;
+	min-height: 76px;
+	padding: 18px 40px;
+	width: min(100%, 360px);
+}
+
+.fullscreen-button:active {
+	transform: scale(0.98);
+}
+
+.fullscreen-overlay.is-hidden {
+	display: none;
+}
+
+
+
+/* --- Core Page Reset --- */
+html, body {
+  margin: 0;
+  padding: 0;
+  width: 100vw;
+  height: 100vh;
+  background-color: #0f1115;
+  overflow: hidden; /* Guarantees zero accidental scrolling */
+  box-sizing: border-box;
+}
+
+/* --- Stream Deck Grid System --- */
+.deck-container {
+  display: grid;
+  /* Dictates exactly 5 columns and 3 rows expanding proportionally */
+  grid-template-columns: repeat(5, 1fr);
+  grid-template-rows: repeat(3, 1fr);
+  
+  /* Fits the viewport accurately while reserving an internal margin gap */
+  width: 100vw;
+  height: 100vh;
+  padding: 16px; 
+  gap: 16px;
+  box-sizing: border-box;
+}
+
+/* --- Styled Keys --- */
+.deck-button {
+  background: linear-gradient(145deg, #1e222b, #12151a);
+  border: 2px solid #2e3440;
+  border-radius: 16px;
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.4), 
+              inset 0 2px 4px rgba(255, 255, 255, 0.05);
+  cursor: pointer;
+  transition: all 0.1s ease;
+  
+  /* Flexbox is used locally here just to center button titles */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+.button-status {
+  align-items: center;
+  background: #303846;
+  border-radius: 999px;
+  bottom: 10px;
+  color: #cbd5e1;
+  display: flex;
+  font: 800 clamp(0.58rem, 1.5vw, 0.76rem)/1 system-ui, sans-serif;
+  gap: 6px;
+  padding: 5px 9px;
+  position: absolute;
+  right: 10px;
+}
+
+.button-status .status-dot {
+  background: #94a3b8;
+  border-radius: 50%;
+  height: 7px;
+  width: 7px;
+}
+
+.button-status.is-active { background: #14532d; color: #dcfce7; }
+.button-status.is-active .status-dot { background: #4ade80; }
+.button-status.is-muted { background: #7f1d1d; color: #fee2e2; }
+.button-status.is-muted .status-dot { background: #f87171; }
+.button-status.is-unknown { opacity: 0.75; }
+
+.deck-button span {
+  color: #f8fafc;
+  font-family: system-ui, sans-serif;
+  font-weight: 700;
+  font-size: clamp(0.9rem, 2.5vw, 1.3rem); /* Responsive sizing scaling nicely */
+  text-align: center;
+}
+
+/* Physical push down interaction */
+.deck-button:active {
+  transform: scale(0.96);
+  border-color: #2dd4bf; /* Matching your overlay color theme */
+  box-shadow: 0 0 15px rgba(45, 212, 191, 0.3);
+}
+
+/* --- Fullscreen Overlay Styling --- */
+.fullscreen-overlay {
+  align-items: center;
+  background: rgba(8, 12, 18, 0.96);
+  display: flex;
+  inset: 0;
+  justify-content: center;
+  padding: 24px;
+  position: fixed;
+  z-index: 10;
+}
+.fullscreen-panel {
+  max-width: 520px;
+  text-align: center;
+  width: 100%;
+}
+.fullscreen-kicker {
+  color: #2dd4bf;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  margin: 0 0 16px;
+  text-transform: uppercase;
+}
+.fullscreen-panel h2 {
+  color: #f8fafc;
+  font-size: clamp(1.8rem, 6vw, 3.2rem);
+  margin: 0 0 32px;
+}
+.fullscreen-button {
+  background: #2dd4bf;
+  border: 0;
+  border-radius: 12px;
+  color: #082f49;
+  cursor: pointer;
+  font-size: clamp(1.1rem, 4vw, 1.5rem);
+  font-weight: 800;
+  min-height: 76px;
+  padding: 18px 40px;
+  width: min(100%, 360px);
+}
+.fullscreen-button:active {
+  transform: scale(0.98);
+}
+.fullscreen-overlay.is-hidden {
+  display: none;
+}

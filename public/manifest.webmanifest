@@ -1,0 +1,19 @@
+{
+  "name": "Deckboard Test Button",
+  "short_name": "Deckboard",
+  "start_url": "/",
+  "scope": "/",
+  "display_override": ["fullscreen", "standalone"],
+  "display": "fullscreen",
+  "orientation": "any",
+  "background_color": "#111111",
+  "theme_color": "#111111",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
