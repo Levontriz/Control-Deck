@@ -1,29 +1,80 @@
 <!doctype html>
+
 <html lang="en">
     <head>
         <meta charset="utf-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-        <meta name="mobile-web-app-capable" content="yes">
-        <meta name="apple-mobile-web-app-capable" content="yes">
-        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-        <meta name="theme-color" content="#111111">
-        <link rel="manifest" href="/manifest.webmanifest">
-		<link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png">
-		<link rel="stylesheet" href="/style.css">
-        <title>Deckboard Test Button</title>
-    </head>
-    <body>
-        <div id="fullscreenOverlay" class="fullscreen-overlay">
-			<div class="fullscreen-panel">
-				<div class="fullscreen-kicker">Deckboard</div>
-				<h2>Ready for fullscreen?</h2>
-				<button id="fullscreenButton" class="fullscreen-button">FULLSCREEN</button>
-			</div>
-			</div>
+        <meta
+            name="viewport"
+            content="width=device-width, initial-scale=1, viewport-fit=cover"
+        >
 
-            <!-- The container is populated purely from config logic -->
-			<div id="deckContainer" class="deck-container"></div>
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta
+        name="apple-mobile-web-app-status-bar-style"
+        content="black-translucent"
+    >
+    <meta name="theme-color" content="#0c0e12">
 
-        <script src="script.js" defer></script>
-    </body>
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png">
+    <link rel="stylesheet" href="/style.css">
+
+    <title>Control Deck</title>
+</head>
+
+<body>
+
+    <!-- Top application bar -->
+    <header class="control-bar top-bar">
+
+        <button
+            id="settingsButton"
+            class="system-button settings-button"
+            type="button"
+            aria-label="Open Android settings"
+        >
+            <span class="system-icon">⚙</span>
+            <span class="system-label">Settings</span>
+        </button>
+
+        <div
+            id="batteryIndicator"
+            class="battery-indicator"
+            aria-label="Battery level"
+        >
+            <span class="battery-icon">🔋</span>
+            <span id="batteryLevel">--%</span>
+        </div>
+
+    </header>
+
+
+    <!-- Main Control Deck -->
+    <main
+        id="deckContainer"
+        class="deck-container"
+    ></main>
+
+
+    <!-- Bottom application bar -->
+    <footer class="control-bar bottom-bar">
+
+        <button
+            id="sleepButton"
+            class="system-button sleep-button"
+            type="button"
+            aria-label="Put tablet to sleep"
+        >
+            <span class="system-icon">🌙</span>
+            <span class="system-label">Sleep (ADD IP INTO SETTINGS)</span>
+        </button>
+
+    </footer>
+
+
+    <script src="script.js" defer></script>
+
+</body>
+
 </html>

@@ -220,8 +220,16 @@ app.listen(3000, () => {
 });
 
 if (fs.existsSync(certificatePath)) {
-    https.createServer({ pfx: fs.readFileSync(certificatePath), passphrase: 'overlay-local' }, app).listen(httpsPort, () => {
-        console.log(`Tablet HTTPS page available on https://192.168.1.36:${httpsPort}`);
+    https.createServer(
+        {
+            pfx: fs.readFileSync(certificatePath),
+            passphrase: 'overlay-local'
+        },
+        app
+    ).listen(httpsPort, () => {
+        console.log(
+            `Tablet HTTPS page available on https://192.168.1.36:${httpsPort}`
+        );
     });
 } else {
     console.warn(`HTTPS certificate missing: ${certificatePath}`);
