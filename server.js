@@ -5,6 +5,7 @@ const https = require('https');
 const fs = require('fs');
 const path = require('path');
 const { execFile, spawn } = require('child_process');
+const readline = require('readline');
 const { promisify } = require('util');
 
 const public = path.join(__dirname, 'public');
@@ -12,8 +13,11 @@ const app = express();
 const httpsPort = 3443;
 const certificatePath = path.join(__dirname, 'certs', 'server.pfx');
 const runFile = promisify(execFile);
-const audioHelper = path.join(__dirname, 'audio-control', 'publish', 'audio-control.dll');
+const audioHelper = path.join(__dirname, 'audio-control', 'publish', 'audio-control.exe');
 let microphonePassthrough = null;
+let currentMedia = { albumArt: '', title: '', artist: '' };
+const mediaClients = new Set();
+let mediaMonitor = null;
 
 // ---- MIDDLEWARE ----
 app.use(express.json());          // Required to read JSON bodies in req.body
@@ -50,11 +54,47 @@ async function runAudioHelper(command, arg, extraArg) {
         throw new Error(`Audio helper missing: ${audioHelper}`);
     }
 
-    const args = [audioHelper, command];
+    const args = [command];
     if (arg) args.push(arg);
     if (extraArg !== undefined) args.push(String(extraArg));
-    const { stdout } = await runFile('dotnet', args, { windowsHide: true });
+    const { stdout } = await runFile(audioHelper, args, {
+        windowsHide: true,
+        maxBuffer: 1024 * 1024
+    });
     return stdout.trim();
+}
+
+function startMediaMonitor() {
+    if (!fs.existsSync(audioHelper)) {
+        console.error(`Audio helper missing: ${audioHelper}`);
+        return;
+    }
+
+    mediaMonitor = spawn(audioHelper, ['media-stream'], {
+        windowsHide: true,
+        stdio: ['ignore', 'pipe', 'pipe']
+    });
+
+    const lines = readline.createInterface({ input: mediaMonitor.stdout });
+    lines.on('line', (line) => {
+        try {
+            currentMedia = JSON.parse(line);
+            const message = `data: ${JSON.stringify(currentMedia)}\n\n`;
+            mediaClients.forEach((client) => client.write(message));
+        } catch (error) {
+            console.error('Invalid media monitor response:', error.message);
+        }
+    });
+
+    mediaMonitor.stderr.on('data', (data) => {
+        console.error(`Media monitor: ${data.toString().trim()}`);
+    });
+
+    mediaMonitor.on('exit', (code) => {
+        mediaMonitor = null;
+        console.error(`Media monitor stopped (${code ?? 'terminated'}); retrying in 2 seconds.`);
+        setTimeout(startMediaMonitor, 2000);
+    });
 }
 
 // ---- 2. SETUP DECKBOARD WEBHOOK ENDPOINT (HTTP) ----
@@ -89,6 +129,29 @@ app.post('/api/macro', (req, res) => {
     res.sendStatus(200);
 });
 
+// Get the current media album art and title from the Windows media player
+app.get('/api/media', async (req, res) => {
+    try {
+        res.json(currentMedia);
+    } catch (error) {
+        console.error('Media status check failed:', error.message);
+        res.status(500).json({ error: 'Windows media status unavailable.' });
+    }
+});
+
+app.get('/api/media/stream', (req, res) => {
+    res.set({
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        Connection: 'keep-alive'
+    });
+    res.flushHeaders();
+    res.write(`data: ${JSON.stringify(currentMedia)}\n\n`);
+    mediaClients.add(res);
+
+    req.on('close', () => mediaClients.delete(res));
+});
+
 app.post('/api/media', (req, res) => {
     const { command } = req.body;
     const supportedCommands = ['TOGGLE', 'PAUSE', 'NEXT', 'PREVIOUS'];
@@ -99,6 +162,7 @@ app.post('/api/media', (req, res) => {
 
     const helperCommands = {
         TOGGLE: 'media-toggle',
+        PAUSE: 'media-pause',
         NEXT: 'media-next',
         PREVIOUS: 'media-previous'
     };
@@ -110,8 +174,9 @@ app.post('/api/media', (req, res) => {
             res.sendStatus(200);
         })
         .catch((error) => {
-            console.error('Media command failed:', error.message);
-            res.status(500).json({ error: 'Windows media control failed.' });
+            const details = error.stderr?.trim() || error.message;
+            console.error('Media command failed:', details);
+            res.status(500).json({ error: `Windows media control failed: ${details}` });
         });
 });
 
@@ -166,7 +231,7 @@ app.post('/api/audio-passthrough', (req, res) => {
             return res.status(500).json({ error: `Audio helper missing: ${audioHelper}` });
         }
 
-        microphonePassthrough = spawn('dotnet', [audioHelper, 'mic-pass'], {
+        microphonePassthrough = spawn(audioHelper, ['mic-pass'], {
             windowsHide: true,
             stdio: ['ignore', 'pipe', 'pipe']
         });
@@ -217,6 +282,7 @@ app.post('/api/soundboard', async (req, res) => {
 // Start the HTTP API server on port 3000
 app.listen(3000, () => {
     console.log('Deckboard API listener running on http://localhost:3000');
+    startMediaMonitor();
 });
 
 if (fs.existsSync(certificatePath)) {

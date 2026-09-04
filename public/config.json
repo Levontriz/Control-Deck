@@ -44,6 +44,14 @@
         }
       ]
     },
+    {
+      "id": "media_thumbnail",
+      "position": 6,
+      "label": "",
+      "type": "get",
+      "endpoint": "/api/media",
+      "status": "media"
+    },
 	{
   "id": "soundboard_folder",
       "position": 3,

@@ -12,7 +12,19 @@ let audioStatus = {
     available: false
 };
 
+let mediaStatus = {
+    albumArt: '',
+    title: '',
+    artist: '',
+    available: false
+};
+
 const soundVolumeKey = 'deckboard-sound-levels';
+
+
+
+
+
 
 
 /* =========================================================
@@ -127,6 +139,11 @@ function getConfiguredButton(buttons, id) {
 function renderButtonStatus(button, element) {
     if (!button.status) return;
 
+    if (button.status === 'media') {
+        renderMediaStatus(element);
+        return;
+    }
+
     const statusElement =
         element.querySelector('.button-status');
 
@@ -156,6 +173,46 @@ function renderButtonStatus(button, element) {
         `button-status ${isActive ? 'is-active' : ''} ${isMuted ? 'is-muted' : ''} ${!audioStatus.available ? 'is-unknown' : ''}`;
 
     statusElement.lastElementChild.textContent = label;
+}
+
+function renderMediaStatus(element) {
+    const image = element.querySelector('.media-art');
+    const title = element.querySelector('.media-title');
+    const artist = element.querySelector('.media-artist');
+    const hasArtwork = mediaStatus.available && mediaStatus.albumArt;
+
+    element.classList.toggle('media-unavailable', !hasArtwork);
+
+    if (hasArtwork) {
+        image.src = `data:image/png;base64,${mediaStatus.albumArt}`;
+        image.alt = mediaStatus.title || 'Current album art';
+    } else {
+        image.removeAttribute('src');
+        image.alt = 'No media playing';
+    }
+
+    title.textContent = mediaStatus.title || 'Nothing playing';
+    artist.textContent = mediaStatus.artist || '';
+
+    setupMediaScrolling(element);
+}
+
+function setupMediaScrolling(element) {
+    element.querySelectorAll('.media-title, .media-artist').forEach((text) => {
+        const window = text.parentElement;
+
+        text.classList.remove('is-scrolling');
+        text.style.removeProperty('--scroll-distance');
+
+        requestAnimationFrame(() => {
+            const overflow = window.scrollWidth - window.clientWidth;
+
+            if (overflow > 2) {
+                text.style.setProperty('--scroll-distance', `${overflow}px`);
+                text.classList.add('is-scrolling');
+            }
+        });
+    });
 }
 
 
@@ -197,10 +254,45 @@ async function refreshAudioStatus() {
                 element.dataset.statusKey
             );
 
-            if (button) {
+            if (button && button.status !== 'media') {
                 renderButtonStatus(button, element);
             }
         });
+}
+
+function connectMediaStream() {
+    const stream = new EventSource('/api/media/stream');
+
+    stream.onmessage = (event) => {
+        try {
+            mediaStatus = {
+                ...JSON.parse(event.data),
+                available: true
+            };
+        } catch (error) {
+            console.error('Invalid media stream event:', error);
+            return;
+        }
+
+        document
+            .querySelectorAll('[data-status-key]')
+            .forEach((element) => {
+                const button = getConfiguredButton(
+                    deckConfig?.buttons || [],
+                    element.dataset.statusKey
+                );
+
+                if (button?.status === 'media') {
+                    renderMediaStatus(element);
+                }
+            });
+    };
+
+    stream.onerror = () => {
+        mediaStatus.available = false;
+        stream.close();
+        setTimeout(connectMediaStream, 2000);
+    };
 }
 
 
@@ -305,7 +397,7 @@ function renderGrid(animation = null) {
                         : '';
 
                 const statusControl =
-                    targetBtn.status
+                    targetBtn.status && targetBtn.status !== 'media'
                         ? `
                             <span class="button-status is-unknown">
                                 <span class="status-dot"></span>
@@ -314,10 +406,31 @@ function renderGrid(animation = null) {
                         `
                         : '';
 
+                const mediaControl = targetBtn.status === 'media'
+                    ? `
+                        <span class="media-status-content">
+                            <span class="vinyl-record" aria-hidden="true">
+                                <img class="media-art" alt="No media playing">
+                                <span class="vinyl-spindle"></span>
+                            </span>
+                            <span class="media-copy">
+                                <span class="media-text-window">
+                                    <span class="media-title">Nothing playing</span>
+                                </span>
+                                <span class="media-text-window">
+                                    <span class="media-artist"></span>
+                                </span>
+                            </span>
+                        </span>
+                    `
+                    : '';
+
                 el.innerHTML = `
                     <span class="button-label">
                         ${targetBtn.label}
                     </span>
+
+                    ${mediaControl}
 
                     ${volumeControl}
 
@@ -565,6 +678,7 @@ async function fireMacroAction(btnConfig) {
 initDeck();
 
 refreshAudioStatus();
+connectMediaStream();
 
 refreshBattery();
 

@@ -2,9 +2,16 @@ using System.Runtime.InteropServices;
 using NAudio.CoreAudioApi;
 using NAudio.Wave;
 
+using System;
+using System.IO;
+using System.Text.Json;
+using System.Threading.Tasks;
+using Windows.Media.Control;
+using Windows.Storage.Streams;
+
 if (args.Length == 0)
 {
-    Console.Error.WriteLine("Usage: mute | unmute | toggle | media-toggle | media-pause | media-next | media-previous | play <filepath> | mic-pass");
+    Console.Error.WriteLine("Usage: mute | unmute | toggle | media-toggle | media-pause | media-next | media-previous | media-art | media-info | media-stream | play <filepath> | mic-pass");
     return 2;
 }
 
@@ -36,6 +43,35 @@ switch (args[0].ToLowerInvariant())
         break;
     case "media-previous":
         PressMediaKey(0xB1);
+        break;
+    case "media-art":
+        GetActiveMediaThumbnailAsBase64Async().ContinueWith(task =>
+        {
+            if (task.IsCompletedSuccessfully)
+            {
+                Console.WriteLine(task.Result);
+            }
+            else
+            {
+                Console.Error.WriteLine($"Error retrieving media thumbnail: {task.Exception?.GetBaseException().Message}");
+            }
+        }).Wait();
+        break;
+    case "media-info":
+        GetActiveMediaInfoAsync().ContinueWith(task =>
+        {
+            if (task.IsCompletedSuccessfully)
+            {
+                Console.WriteLine(task.Result);
+            }
+            else
+            {
+                Console.Error.WriteLine($"Error retrieving media info: {task.Exception?.GetBaseException().Message}");
+            }
+        }).Wait();
+        break;
+    case "media-stream":
+        StreamMediaInfoAsync().GetAwaiter().GetResult();
         break;
     case "play":
         if (args.Length < 2)
@@ -190,4 +226,93 @@ static MMDevice GetPhysicalMicrophone(MMDeviceEnumerator enumerator)
     }
 
     return physicalMicrophone;
+}
+
+static async Task<string> GetActiveMediaThumbnailAsBase64Async()
+{
+    try
+    {
+        // 1. Access the Windows system media session manager
+        var sessionManager = await GlobalSystemMediaTransportControlsSessionManager.RequestAsync();
+        var currentSession = sessionManager.GetCurrentSession();
+        
+        // Return null or empty if no media (Spotify, YouTube, etc.) is currently active
+        if (currentSession == null) return string.Empty;
+
+        // 2. Fetch the metadata properties of the currently playing track
+        var mediaProperties = await currentSession.TryGetMediaPropertiesAsync();
+        if (mediaProperties?.Thumbnail == null) return string.Empty;
+
+        // 3. Open the thumbnail stream and convert it into a standard .NET Stream
+        using (var winRtStream = await mediaProperties.Thumbnail.OpenReadAsync())
+        using (var netStream = winRtStream.AsStreamForRead())
+        using (var memoryStream = new MemoryStream())
+        {
+            // 4. Copy the image bytes into memory and convert to a Base64 string
+            await netStream.CopyToAsync(memoryStream);
+            byte[] imageBytes = memoryStream.ToArray();
+            return Convert.ToBase64String(imageBytes);
+        }
+    }
+    catch
+    {
+        // Fail gracefully and return an empty string if permissions or streams fail
+        return string.Empty;
+    }
+}
+
+static async Task<string> GetActiveMediaInfoAsync()
+{
+    try
+    {
+        var sessionManager = await GlobalSystemMediaTransportControlsSessionManager.RequestAsync();
+        var currentSession = sessionManager.GetCurrentSession();
+
+        if (currentSession == null)
+        {
+            return JsonSerializer.Serialize(new { albumArt = "", title = "", artist = "" });
+        }
+
+        var mediaProperties = await currentSession.TryGetMediaPropertiesAsync();
+        var albumArt = "";
+
+        if (mediaProperties?.Thumbnail != null)
+        {
+            using var winRtStream = await mediaProperties.Thumbnail.OpenReadAsync();
+            using var netStream = winRtStream.AsStreamForRead();
+            using var memoryStream = new MemoryStream();
+            await netStream.CopyToAsync(memoryStream);
+            albumArt = Convert.ToBase64String(memoryStream.ToArray());
+        }
+
+        return JsonSerializer.Serialize(new
+        {
+            albumArt,
+            title = mediaProperties?.Title ?? "",
+            artist = mediaProperties?.Artist ?? ""
+        });
+    }
+    catch
+    {
+        return JsonSerializer.Serialize(new { albumArt = "", title = "", artist = "" });
+    }
+}
+
+static async Task StreamMediaInfoAsync()
+{
+    Console.SetOut(new StreamWriter(Console.OpenStandardOutput()) { AutoFlush = true });
+    string? previousInfo = null;
+
+    while (true)
+    {
+        var mediaInfo = await GetActiveMediaInfoAsync();
+
+        if (mediaInfo != previousInfo)
+        {
+            Console.WriteLine(mediaInfo);
+            previousInfo = mediaInfo;
+        }
+
+        await Task.Delay(TimeSpan.FromSeconds(1));
+    }
 }

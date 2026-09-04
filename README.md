@@ -154,6 +154,8 @@ The tablet page uses the JSON deck configuration in `public/config.json`, and ea
 - `/api/audio-passthrough`
 - `/api/soundboard`
 
+To show the current Windows media artwork as a spinning vinyl status tile, add `"status": "media"` to a configured button. The local Windows helper stays running in media-stream mode and sends only changed artwork, title, and artist data to the local server. The browser receives those updates over the local `/api/media/stream` event stream.
+
 ## 6) Use the OBS overlay
 
 The overlay file is `overlay.html`. It connects to the WebSocket server on `ws://localhost:8080` and receives spawn events from the deck.

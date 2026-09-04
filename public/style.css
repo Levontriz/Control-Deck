@@ -192,6 +192,7 @@ Deck Buttons
 
 .deck-button {
 position: relative;
+container-type: size;
 
 display: flex;
 align-items: center;
@@ -345,6 +346,117 @@ background: #f87171;
 
 .button-status.is-unknown {
 opacity: 0.75;
+}
+
+/* =========================================================
+Media Status
+========================================================= */
+
+.media-status-content {
+display: flex;
+flex-direction: column;
+align-items: center;
+justify-content: center;
+gap: 8px;
+width: 100%;
+height: 100%;
+min-width: 0;
+}
+
+.media-status-content .vinyl-record {
+position: relative;
+width: min(68%, 150px);
+aspect-ratio: 1;
+border-radius: 50%;
+background: repeating-radial-gradient(circle, #252a31 0 2px, #090b0e 3px 5px);
+box-shadow: 0 8px 18px rgba(0, 0, 0, 0.45);
+flex: 0 1 auto;
+}
+
+.media-art {
+position: absolute;
+inset: 22%;
+width: 56%;
+height: 56%;
+border-radius: 50%;
+object-fit: cover;
+animation: spin 3s linear infinite;
+-webkit-mask-image: radial-gradient(circle, transparent 8%, black 8.5%);
+mask-image: radial-gradient(circle, transparent 8%, black 8.5%);
+}
+
+.vinyl-spindle {
+position: absolute;
+top: 50%;
+left: 50%;
+width: 12px;
+height: 12px;
+border-radius: 50%;
+transform: translate(-50%, -50%);
+background: radial-gradient(circle, #d1d5db, #525963);
+box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.8);
+}
+
+.media-copy {
+display: flex;
+flex-direction: column;
+max-width: 100%;
+min-width: 0;
+text-align: center;
+width: 100%;
+overflow: hidden;
+gap: 2px;
+flex: 0 0 auto;
+}
+
+.media-text-window {
+display: block;
+width: 100%;
+min-width: 0;
+overflow: hidden;
+white-space: nowrap;
+height: 1.25em;
+flex: 0 0 1.25em;
+}
+
+.media-status-content .media-title {
+display: inline-block;
+max-width: 100%;
+font-size: clamp(0.75rem, 8cqw, 1rem);
+line-height: 1.25;
+font-weight: 800;
+}
+
+.media-status-content .media-artist {
+display: inline-block;
+max-width: 100%;
+color: #94a3b8;
+font-size: clamp(0.65rem, 6cqw, 0.8rem);
+line-height: 1.25;
+}
+
+.media-title.is-scrolling,
+.media-artist.is-scrolling {
+max-width: none;
+animation: media-marquee 9s ease-in-out infinite alternate;
+}
+
+@keyframes media-marquee {
+0%, 15% {
+transform: translateX(0);
+}
+85%, 100% {
+transform: translateX(calc(-1 * var(--scroll-distance)));
+}
+}
+
+.media-unavailable .vinyl-record {
+opacity: 0.4;
+}
+
+@keyframes spin {
+from { transform: rotate(0deg); }
+to { transform: rotate(360deg); }
 }
 
 /* =========================================================
