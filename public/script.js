@@ -1,5 +1,6 @@
 const deckContainer = document.getElementById('deckContainer');
 const settingsButton = document.getElementById('settingsButton');
+const settingsIPButton = document.getElementById('settingsIPButton');
 const sleepButton = document.getElementById('sleepButton');
 const batteryLevel = document.getElementById('batteryLevel');
 
@@ -34,6 +35,12 @@ const soundVolumeKey = 'deckboard-sound-levels';
 settingsButton.addEventListener('click', () => {
     if (window.Android) {
         Android.openSettings();
+    }
+});
+
+settingsIPButton.addEventListener('click', () => {
+    if (window.Android) {
+        Android.openServerSettingsDialog();
     }
 });
 
