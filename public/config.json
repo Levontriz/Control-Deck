@@ -41,6 +41,14 @@
           "type": "action",
           "endpoint": "/api/media",
           "payload": { "command": "NEXT" }
+        },
+        {
+          "id": "media_thumbnail",
+          "position": 5,
+          "label": "",
+          "type": "get",
+          "endpoint": "/api/media",
+          "status": "media"
         }
       ]
     },
@@ -52,8 +60,8 @@
       "endpoint": "/api/media",
       "status": "media"
     },
-	{
-  "id": "soundboard_folder",
+	  {
+      "id": "soundboard_folder",
       "position": 3,
       "label": "📁 Soundboard",
       "type": "folder",
