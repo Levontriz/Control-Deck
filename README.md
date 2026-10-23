@@ -61,6 +61,17 @@ audio-control\publish\audio-control.dll
 
 If you want to publish again later, re-run the `dotnet publish` command above.
 
+The server raises its own priority and explicitly raises the persistent
+audio-control controller to Windows `High` priority after it starts. The
+controller also applies the same priority to itself.
+
+This variant starts one `audio-control.exe controller` process when the server
+starts. Media commands, microphone status, mute operations, soundboard playback,
+media monitoring, and microphone passthrough are sent to that process over its
+standard input/output command channel. This avoids starting a new .NET process
+for every pause or skip command, which improves responsiveness while the
+computer is under heavy load.
+
 ## 3) Create the HTTPS certificate for the tablet page
 
 The server tries to start a secure tablet page on port 3443 if a certificate exists at:
