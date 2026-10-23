@@ -4,20 +4,32 @@ const { WebSocketServer } = require('ws');
 const https = require('https');
 const fs = require('fs');
 const path = require('path');
-const { execFile, spawn } = require('child_process');
+const { spawn } = require('child_process');
 const readline = require('readline');
-const { promisify } = require('util');
+const os = require('os');
 
 const public = path.join(__dirname, 'public');
 const app = express();
 const httpsPort = 3443;
 const certificatePath = path.join(__dirname, 'certs', 'server.pfx');
-const runFile = promisify(execFile);
 const audioHelper = path.join(__dirname, 'audio-control', 'publish', 'audio-control.exe');
-let microphonePassthrough = null;
+let controller = null;
+let controllerReady = Promise.resolve();
+let resolveControllerReady;
+let rejectControllerReady;
+const pendingControllerCommands = new Map();
+let nextControllerRequestId = 1;
 let currentMedia = { albumArt: '', title: '', artist: '' };
 const mediaClients = new Set();
-let mediaMonitor = null;
+
+const highPriority = os.constants.priority.PRIORITY_HIGH;
+
+try {
+    os.setPriority(0, highPriority);
+    console.log('Main Node.js process priority set to HIGH.');
+} catch (error) {
+    console.error('Failed to set main process priority:', error.message);
+}
 
 // ---- MIDDLEWARE ----
 app.use(express.json());          // Required to read JSON bodies in req.body
@@ -49,52 +61,104 @@ function broadcast(payload) {
     return broadcastCount;
 }
 
-async function runAudioHelper(command, arg, extraArg) {
-    if (!fs.existsSync(audioHelper)) {
-        throw new Error(`Audio helper missing: ${audioHelper}`);
+function setHighPriority(child, description, logSuccess = true) {
+    try {
+        os.setPriority(child.pid, highPriority);
+        if (logSuccess) {
+            console.log(`${description} priority set to HIGH (PID ${child.pid}).`);
+        }
+    } catch (error) {
+        console.error(`Failed to set ${description} priority to HIGH:`, error.message);
     }
-
-    const args = [command];
-    if (arg) args.push(arg);
-    if (extraArg !== undefined) args.push(String(extraArg));
-    const { stdout } = await runFile(audioHelper, args, {
-        windowsHide: true,
-        maxBuffer: 1024 * 1024
-    });
-    return stdout.trim();
 }
 
-function startMediaMonitor() {
+function startController() {
     if (!fs.existsSync(audioHelper)) {
         console.error(`Audio helper missing: ${audioHelper}`);
         return;
     }
 
-    mediaMonitor = spawn(audioHelper, ['media-stream'], {
-        windowsHide: true,
-        stdio: ['ignore', 'pipe', 'pipe']
+    controllerReady = new Promise((resolve, reject) => {
+        resolveControllerReady = resolve;
+        rejectControllerReady = reject;
     });
 
-    const lines = readline.createInterface({ input: mediaMonitor.stdout });
+    controller = spawn(audioHelper, ['controller'], {
+        windowsHide: true,
+        stdio: ['pipe', 'pipe', 'pipe']
+    });
+
+    controller.once('spawn', () => {
+        setHighPriority(controller, 'Audio controller');
+        resolveControllerReady();
+    });
+
+    const lines = readline.createInterface({ input: controller.stdout });
     lines.on('line', (line) => {
         try {
-            currentMedia = JSON.parse(line);
-            const message = `data: ${JSON.stringify(currentMedia)}\n\n`;
-            mediaClients.forEach((client) => client.write(message));
+            const message = JSON.parse(line);
+            if (message.type === 'media') {
+                currentMedia = message.data;
+                const payload = `data: ${JSON.stringify(currentMedia)}\n\n`;
+                mediaClients.forEach((client) => client.write(payload));
+                return;
+            }
+
+            const pending = pendingControllerCommands.get(message.id);
+            if (!pending) return;
+            pendingControllerCommands.delete(message.id);
+            if (message.ok) pending.resolve(message.result ?? '');
+            else pending.reject(new Error(message.error || 'Audio controller command failed.'));
         } catch (error) {
-            console.error('Invalid media monitor response:', error.message);
+            console.error('Invalid audio controller response:', error.message);
         }
     });
 
-    mediaMonitor.stderr.on('data', (data) => {
-        console.error(`Media monitor: ${data.toString().trim()}`);
+    controller.stderr.on('data', (data) => {
+        console.error(`Audio controller: ${data.toString().trim()}`);
     });
 
-    mediaMonitor.on('exit', (code) => {
-        mediaMonitor = null;
-        console.error(`Media monitor stopped (${code ?? 'terminated'}); retrying in 2 seconds.`);
-        setTimeout(startMediaMonitor, 2000);
+    controller.on('error', (error) => {
+        rejectControllerReady(error);
+        console.error('Audio controller failed to start:', error.message);
     });
+
+    controller.on('exit', (code, signal) => {
+        controller = null;
+        pendingControllerCommands.forEach(({ reject }) => {
+            reject(new Error(`Audio controller stopped (${code ?? signal ?? 'terminated'}).`));
+        });
+        pendingControllerCommands.clear();
+        console.error(
+            `Audio controller stopped (code ${code ?? 'none'}, signal ${signal ?? 'none'}); retrying in 2 seconds.`
+        );
+        setTimeout(startController, 2000);
+    });
+}
+
+async function runAudioHelper(command, arg, extraArg) {
+    await controllerReady;
+    if (!controller || controller.exitCode !== null) {
+        throw new Error('Audio controller is not running.');
+    }
+
+    const id = nextControllerRequestId++;
+    const request = { id, command };
+    if (arg !== undefined) request.arg = arg;
+    if (extraArg !== undefined) request.extraArg = extraArg;
+
+    return new Promise((resolve, reject) => {
+        pendingControllerCommands.set(id, { resolve, reject });
+        controller.stdin.write(`${JSON.stringify(request)}\n`, (error) => {
+            if (!error) return;
+            pendingControllerCommands.delete(id);
+            reject(error);
+        });
+    });
+}
+
+function startMediaMonitor() {
+    startController();
 }
 
 // ---- 2. SETUP DECKBOARD WEBHOOK ENDPOINT (HTTP) ----
@@ -202,7 +266,7 @@ app.get('/api/status', async (req, res) => {
     try {
         const microphoneState = await runAudioHelper('status');
         res.json({
-            linked: Boolean(microphonePassthrough && !microphonePassthrough.killed),
+            linked: await runAudioHelper('passthrough-status') === 'active',
             muted: microphoneState === 'muted'
         });
     } catch (error) {
@@ -211,45 +275,28 @@ app.get('/api/status', async (req, res) => {
     }
 });
 
-app.post('/api/audio-passthrough', (req, res) => {
+app.post('/api/audio-passthrough', async (req, res) => {
     const { state } = req.body;
 
-    const requestedState = state === 'toggle'
-        ? (microphonePassthrough && !microphonePassthrough.killed ? 'stop' : 'start')
-        : state;
+    let requestedState = state;
+    if (state === 'toggle') {
+        requestedState = await runAudioHelper('passthrough-status') === 'active'
+            ? 'stop'
+            : 'start';
+    }
 
     if (!['start', 'stop'].includes(requestedState)) {
         return res.status(400).json({ error: 'State must be start, stop, or toggle.' });
     }
 
     if (requestedState === 'start') {
-        if (microphonePassthrough && !microphonePassthrough.killed) {
-            return res.json({ state: 'active' });
-        }
-
-        if (!fs.existsSync(audioHelper)) {
-            return res.status(500).json({ error: `Audio helper missing: ${audioHelper}` });
-        }
-
-        microphonePassthrough = spawn(audioHelper, ['mic-pass'], {
-            windowsHide: true,
-            stdio: ['ignore', 'pipe', 'pipe']
-        });
-        microphonePassthrough.stdout.on('data', (data) => console.log(data.toString().trim()));
-        microphonePassthrough.stderr.on('data', (data) => console.error(data.toString().trim()));
-        microphonePassthrough.on('exit', (code) => {
-            console.log(`Microphone passthrough stopped (${code ?? 'terminated'})`);
-            microphonePassthrough = null;
-        });
-
-        return res.json({ state: 'starting' });
+        const result = await runAudioHelper('passthrough-start');
+        return res.json({ state: result || 'starting' });
     }
 
-    if (microphonePassthrough && !microphonePassthrough.killed) {
-        microphonePassthrough.kill();
-        microphonePassthrough = null;
-    }
-    res.json({ state: 'stopped' });
+    runAudioHelper('passthrough-stop')
+        .then(() => res.json({ state: 'stopped' }))
+        .catch((error) => res.status(500).json({ error: error.message }));
 });
 
 app.post('/api/soundboard', async (req, res) => {
