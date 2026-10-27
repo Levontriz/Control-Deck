@@ -49,6 +49,12 @@
           "type": "get",
           "endpoint": "/api/media",
           "status": "media"
+        },
+        {
+          "id": "spotify_folder",
+          "position": 6,
+          "label": "🎵 Spotify",
+          "type": "spotify_folder"
         }
       ]
     },

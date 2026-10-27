@@ -475,6 +475,87 @@ border-color: #fbbf24;
 border-color: #3b82f6;
 }
 
+/* Spotify track picker */
+
+.spotify-track-overlay {
+position: fixed;
+inset: 0;
+z-index: 40;
+display: flex;
+align-items: center;
+justify-content: center;
+padding: 20px;
+background: rgba(5, 8, 12, 0.82);
+}
+
+.spotify-track-panel {
+display: flex;
+flex-direction: column;
+width: min(94vw, 680px);
+max-height: min(82vh, 720px);
+overflow: hidden;
+border: 2px solid #f59e0b;
+border-radius: 18px;
+background: #151a21;
+box-shadow: 0 18px 50px rgba(0, 0, 0, 0.6);
+}
+
+.spotify-track-heading {
+display: flex;
+align-items: center;
+justify-content: space-between;
+gap: 16px;
+padding: 14px 18px;
+border-bottom: 1px solid #303846;
+}
+
+.spotify-track-heading h2 {
+margin: 0;
+overflow: hidden;
+color: #f8fafc;
+font-size: clamp(1rem, 3vw, 1.4rem);
+text-overflow: ellipsis;
+white-space: nowrap;
+}
+
+.spotify-track-heading button {
+width: 42px;
+height: 42px;
+border: 1px solid #64748b;
+border-radius: 10px;
+background: #222936;
+color: #f8fafc;
+font-size: 1.2rem;
+cursor: pointer;
+}
+
+.spotify-track-list {
+display: flex;
+flex-direction: column;
+gap: 8px;
+padding: 12px;
+overflow-y: auto;
+overscroll-behavior: contain;
+}
+
+.spotify-track-item {
+flex: 0 0 auto;
+min-height: 52px;
+padding: 12px 14px;
+border: 1px solid #303846;
+border-radius: 10px;
+background: #1e2530;
+color: #f8fafc;
+font: 700 0.95rem/1.25 system-ui, sans-serif;
+text-align: left;
+cursor: pointer;
+}
+
+.spotify-track-item:active {
+border-color: #2dd4bf;
+background: #26333b;
+}
+
 /* =========================================================
 Empty Slots
 ========================================================= */

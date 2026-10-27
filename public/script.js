@@ -19,6 +19,10 @@ let mediaStatus = {
     artist: '',
     available: false
 };
+let spotifyPlaybackSettings = {
+    shuffle: false,
+    repeat: 'off'
+};
 
 const soundVolumeKey = 'deckboard-sound-levels';
 
@@ -309,7 +313,9 @@ function connectMediaStream() {
 
 async function initDeck() {
     try {
-        const response = await fetch('config.json');
+        const response = await fetch(`config.json?version=${Date.now()}`, {
+            cache: 'no-store'
+        });
 
         deckConfig = await response.json();
 
@@ -498,6 +504,59 @@ function renderGrid(animation = null) {
                         () => enterFolder(targetBtn)
                     );
 
+                } else if (targetBtn.type === 'spotify_folder') {
+
+                    el.classList.add('folder-button');
+
+                    el.addEventListener(
+                        'click',
+                        () => openSpotifyFolder()
+                    );
+
+                } else if (targetBtn.type === 'spotify_playlist') {
+
+                    el.classList.add('folder-button');
+
+                    el.addEventListener(
+                        'click',
+                        () => openSpotifyPlaylist(targetBtn)
+                    );
+
+                } else if (targetBtn.type === 'spotify_next') {
+
+                    el.addEventListener(
+                        'click',
+                        targetBtn.onClick
+                    );
+
+                } else if (targetBtn.type === 'spotify_control') {
+
+                    el.addEventListener(
+                        'click',
+                        targetBtn.onClick
+                    );
+
+                } else if (targetBtn.type === 'spotify_track_menu') {
+
+                    el.addEventListener(
+                        'click',
+                        targetBtn.onClick
+                    );
+
+                } else if (targetBtn.type === 'spotify_connect') {
+
+                    el.addEventListener(
+                        'click',
+                        () => { window.location.href = '/api/spotify/login'; }
+                    );
+
+                } else if (targetBtn.type === 'spotify_setup') {
+
+                    el.addEventListener(
+                        'click',
+                        () => console.error('Set SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET, and SPOTIFY_REDIRECT_URI on the server first.')
+                    );
+
                 } else if (targetBtn.type === 'action') {
 
                     el.addEventListener(
@@ -629,6 +688,192 @@ function navigateBack() {
     }
 }
 
+async function openSpotifyFolder() {
+    try {
+        const statusResponse = await fetch('/api/spotify/status', { cache: 'no-store' });
+        const status = await statusResponse.json();
+
+        if (!status.configured || !status.connected) {
+            folderHistory.push(currentButtons);
+            currentButtons = [{
+                id: 'spotify_connect',
+                position: 2,
+                label: status.configured ? '🔗 Connect Spotify' : '⚙ Configure Spotify',
+                type: status.configured ? 'spotify_connect' : 'spotify_setup'
+            }];
+            renderGrid('forward');
+            return;
+        }
+
+        const response = await fetch('/api/spotify/playlists', { cache: 'no-store' });
+        if (!response.ok) throw new Error((await response.json()).error || 'Could not load Spotify playlists.');
+        const playlists = await response.json();
+
+        folderHistory.push(currentButtons);
+        renderSpotifyPlaylistPage(playlists, 0, true);
+    } catch (error) {
+        console.error('Failed to load Spotify playlists:', error);
+    }
+}
+
+async function openSpotifyPlaylist(button) {
+    try {
+        const response = await fetch(
+            `/api/spotify/playlists/${encodeURIComponent(button.playlist.id)}/tracks`,
+            { cache: 'no-store' }
+        );
+        if (!response.ok) throw new Error((await response.json()).error || 'Could not load Spotify tracks.');
+        const tracks = await response.json();
+
+        const stateResponse = await fetch('/api/spotify/player-state', { cache: 'no-store' });
+        if (stateResponse.ok) {
+            spotifyPlaybackSettings = await stateResponse.json();
+        }
+
+        folderHistory.push(currentButtons);
+        renderSpotifyTrackPage(button.playlist, tracks, 0, true);
+    } catch (error) {
+        console.error('Failed to load Spotify playlist tracks:', error);
+    }
+}
+
+function renderSpotifyPlaylistPage(playlists, page, animate) {
+    const pageSize = 13;
+    const start = page * pageSize;
+    currentButtons = playlists.slice(start, start + pageSize).map((playlist, index) => ({
+        id: `spotify_playlist_${playlist.id}`,
+        position: index + 2,
+        label: `🎵 ${playlist.name}`,
+        type: 'spotify_playlist',
+        playlist
+    }));
+    if (start + pageSize < playlists.length) {
+        currentButtons.push({
+            id: 'spotify_next_playlists',
+            position: 15,
+            label: 'Next Playlists ▶',
+            type: 'spotify_next',
+            onClick: () => renderSpotifyPlaylistPage(playlists, page + 1, true)
+        });
+    }
+    renderGrid(animate ? 'forward' : null);
+}
+
+function renderSpotifyTrackPage(playlist, tracks, page, animate) {
+    currentButtons = [{
+        id: `spotify_play_${playlist.id}`,
+        position: 2,
+        label: '▶ Play Playlist',
+        type: 'action',
+        endpoint: '/api/spotify/play',
+        method: 'PUT',
+        payload: { playlistId: playlist.id }
+    }, {
+        id: `spotify_shuffle_${playlist.id}`,
+        position: 3,
+        label: `🔀 Shuffle: ${spotifyPlaybackSettings.shuffle ? 'On' : 'Off'}`,
+        type: 'spotify_control',
+        onClick: () => toggleSpotifyShuffle()
+    }, {
+        id: `spotify_repeat_${playlist.id}`,
+        position: 4,
+        label: `🔁 Repeat: ${spotifyPlaybackSettings.repeat}`,
+        type: 'spotify_control',
+        onClick: () => cycleSpotifyRepeat()
+    }, {
+        id: `spotify_tracks_${playlist.id}`,
+        position: 5,
+        label: `🎵 Browse Tracks (${tracks.length})`,
+        type: 'spotify_track_menu',
+        onClick: () => openSpotifyTrackMenu(playlist, tracks)
+    }];
+    renderGrid(animate ? 'forward' : null);
+}
+
+async function updateSpotifyControl(endpoint, payload) {
+    const response = await fetch(endpoint, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+    });
+    if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.error || 'Spotify control request failed.');
+    }
+}
+
+async function toggleSpotifyShuffle() {
+    const nextState = !spotifyPlaybackSettings.shuffle;
+    try {
+        await updateSpotifyControl('/api/spotify/shuffle', { state: nextState });
+        spotifyPlaybackSettings.shuffle = nextState;
+        renderGrid();
+    } catch (error) {
+        console.error('Failed to change Spotify shuffle:', error);
+    }
+}
+
+async function cycleSpotifyRepeat() {
+    const modes = ['off', 'context', 'track'];
+    const nextState = modes[(modes.indexOf(spotifyPlaybackSettings.repeat) + 1) % modes.length];
+    try {
+        await updateSpotifyControl('/api/spotify/repeat', { state: nextState });
+        spotifyPlaybackSettings.repeat = nextState;
+        renderGrid();
+    } catch (error) {
+        console.error('Failed to change Spotify repeat:', error);
+    }
+}
+
+function openSpotifyTrackMenu(playlist, tracks) {
+    const overlay = document.createElement('div');
+    overlay.className = 'spotify-track-overlay';
+    overlay.addEventListener('click', (event) => {
+        if (event.target === overlay) overlay.remove();
+    });
+
+    const panel = document.createElement('section');
+    panel.className = 'spotify-track-panel';
+    panel.setAttribute('role', 'dialog');
+    panel.setAttribute('aria-modal', 'true');
+
+    const heading = document.createElement('div');
+    heading.className = 'spotify-track-heading';
+    heading.innerHTML = `<h2></h2><button type="button" aria-label="Close track list">✕</button>`;
+    heading.querySelector('h2').textContent = playlist.name;
+    heading.querySelector('button').addEventListener('click', () => overlay.remove());
+
+    const list = document.createElement('div');
+    list.className = 'spotify-track-list';
+    tracks.forEach((track) => {
+        const button = document.createElement('button');
+        button.className = 'spotify-track-item';
+        button.type = 'button';
+        button.textContent = `${track.name} — ${track.artist}`;
+        button.addEventListener('click', async () => {
+            try {
+                const played = await fireMacroAction({
+                    id: `spotify_track_${track.id}`,
+                    endpoint: '/api/spotify/play',
+                    method: 'PUT',
+                    payload: {
+                        playlistId: playlist.id,
+                        position: track.position
+                    }
+                });
+                if (played) overlay.remove();
+            } catch (error) {
+                console.error('Failed to play Spotify track:', error);
+            }
+        });
+        list.appendChild(button);
+    });
+
+    panel.append(heading, list);
+    overlay.appendChild(panel);
+    document.body.appendChild(overlay);
+}
+
 
 /* =========================================================
    API Action Dispatcher
@@ -639,7 +884,7 @@ async function fireMacroAction(btnConfig) {
         const response = await fetch(
             btnConfig.endpoint,
             {
-                method: 'POST',
+                method: btnConfig.method || 'POST',
                 headers: {
                     'Content-Type': 'application/json'
                 },
@@ -662,11 +907,13 @@ async function fireMacroAction(btnConfig) {
             );
 
             refreshAudioStatus();
+            return true;
 
         } else {
             console.error(
                 `Endpoint error for action [${btnConfig.id}]`
             );
+            return false;
         }
 
     } catch (error) {
@@ -674,6 +921,7 @@ async function fireMacroAction(btnConfig) {
             'Network communication breakdown:',
             error
         );
+        return false;
     }
 }
 

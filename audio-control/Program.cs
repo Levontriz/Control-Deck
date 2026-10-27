@@ -12,7 +12,14 @@ if (args.Length == 0)
     return 2;
 }
 
-Process.GetCurrentProcess().PriorityClass = ProcessPriorityClass.High;
+try
+{
+    Process.GetCurrentProcess().PriorityClass = ProcessPriorityClass.High;
+}
+catch (Exception ex)
+{
+    Console.Error.WriteLine($"Unable to set audio helper priority to High: {ex.Message}");
+}
 
 switch (args[0].ToLowerInvariant())
 {

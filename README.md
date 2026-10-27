@@ -61,16 +61,17 @@ audio-control\publish\audio-control.dll
 
 If you want to publish again later, re-run the `dotnet publish` command above.
 
-The server raises its own priority and explicitly raises the persistent
-audio-control controller to Windows `High` priority after it starts. The
-controller also applies the same priority to itself.
-
 This variant starts one `audio-control.exe controller` process when the server
 starts. Media commands, microphone status, mute operations, soundboard playback,
 media monitoring, and microphone passthrough are sent to that process over its
 standard input/output command channel. This avoids starting a new .NET process
 for every pause or skip command, which improves responsiveness while the
 computer is under heavy load.
+
+The Node.js orchestration process remains at normal Windows priority so it does
+not starve the terminal or event loop. The persistent audio helper and its
+microphone capture remain at `High` priority, which keeps the real-time audio
+path responsive without making startup output appear frozen.
 
 ## 3) Create the HTTPS certificate for the tablet page
 
@@ -165,6 +166,45 @@ The tablet page uses the JSON deck configuration in `public/config.json`, and ea
 - `/api/audio-passthrough`
 - `/api/soundboard`
 
+### Spotify playlist controls
+
+Control Deck can add a live Spotify folder under the Media controls. The
+server performs the Spotify OAuth flow, so end users never enter a client ID,
+client secret, or API key. The credentials stay on the Windows server and are
+never sent to the tablet.
+
+1. Create an application in the [Spotify Developer Dashboard](https://developer.spotify.com/dashboard).
+2. Set its redirect URI to the exact Control Deck address the tablet uses.
+   For a local HTTPS server this may be, for example,
+   `https://192.168.1.36:3443/api/spotify/callback`.
+   If `SPOTIFY_REDIRECT_URI` is not set, Control Deck derives the callback
+   from the address used to open the login page, so the tablet address must be
+   registered rather than `127.0.0.1`.
+3. Set these environment variables before starting Control Deck:
+
+```powershell
+$env:SPOTIFY_CLIENT_ID = "your-client-id"
+$env:SPOTIFY_CLIENT_SECRET = "your-client-secret"
+# Optional when the login page is opened using this same address.
+# $env:SPOTIFY_REDIRECT_URI = "https://192.168.1.36:3443/api/spotify/callback"
+node server.js
+```
+
+The redirect URI must be reachable by the device performing the first
+connection and must match the Spotify dashboard exactly. The user opens the
+`🎵 Spotify` folder once, taps **Connect Spotify**, and completes Spotify's
+normal authorization page. After that, the folder lists the user's playlists.
+Opening a playlist provides **Play Playlist** plus individual track buttons;
+the **Browse Tracks** button opens a scrollable track picker, and selecting a
+track starts playback at that track. The playlist view also provides Shuffle
+and Repeat controls (`off`, `context`, and `track`). Playlist controls require
+Spotify playback API access; the Windows media-key controls remain available
+independently.
+
+Spotify playback control requires the user to have Spotify Premium and an
+active Spotify playback device. The server keeps the refresh token in memory
+only, so restarting Control Deck requires the user to connect again.
+
 To show the current Windows media artwork as a spinning vinyl status tile, add `"status": "media"` to a configured button. The local Windows helper stays running in media-stream mode and sends only changed artwork, title, and artist data to the local server. The browser receives those updates over the local `/api/media/stream` event stream.
 
 ## 6) Use the OBS overlay
@@ -222,6 +262,11 @@ http://<PC_IP>:3000
 ```text
 http://<PC_IP>:3000/api/status
 ```
+
+If starting `node server.js` reports that port 8080, 3000, or 3443 is
+already in use, an existing server instance is still running. Reuse that
+instance or stop it before starting another one; do not start multiple
+copies of the server.
 
 ### The audio helper fails
 
